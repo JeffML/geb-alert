@@ -1,0 +1,70 @@
+apply plugin: "groovy"
+apply plugin: "idea"
+apply plugin: "eclipse"
+
+repositories {
+	mavenCentral()
+	//jcenter()
+}
+
+configurations {
+	testCompile.transitive = true
+}
+
+// The drivers we want to use
+ext.drivers = ["chrome", "firefox"] 
+
+dependencies {
+	System.setProperty("webdriver.chrome.driver", "/usr/bin/chromedriver")
+	compile "org.codehaus.groovy:groovy-all:2.1.1"
+
+	def gebVersion = "0.9.3"
+	def seleniumVersion = "2.43.1"
+
+	// If using JUnit, need to depend on geb-junit (3 or 4)
+	testCompile "org.gebish:geb-junit4:$gebVersion"
+	testCompile "junit:junit-dep:4.11"
+
+	// Drivers
+	drivers.each { driver ->
+			testCompile "org.seleniumhq.selenium:selenium-$driver-driver:$seleniumVersion"
+			testCompile "org.seleniumhq.selenium:selenium-support:$seleniumVersion"
+	}
+}
+
+drivers.each { driver ->
+	def testSingle = System.getProperty("test.single")
+	if (testSingle) System.setProperty("${driver}Test.single", testSingle)
+	
+	def hostUrl = System.getProperty("host.url", "http://devux.fisher.mavericklabel.com")
+	
+	task "${driver}Test"(type: Test) {
+		reports.html.destination = file("$name/tests")
+		reports.junitXml.destination = file("$buildDir/test-results/$name")
+		
+		testLogging {
+			stackTraceFilters "groovy"
+			showStandardStreams false    //makes the standard streams (err and out) visible at console when running tests
+		}
+	  
+		
+//		forkEvery = 5
+		maxHeapSize = "2048m"
+		minHeapSize = "512m"
+		jvmArgs "-XX:MaxPermSize=1024m" 
+
+		systemProperty "geb.build.reportsDir", reporting.file("$name/geb")
+		systemProperty "geb.env", driver
+		systemProperty "geb.build.baseUrl", hostUrl
+	}
+}
+
+
+test {
+	dependsOn drivers.collect { tasks["${it}Test"] }
+	enabled=false;
+}
+
+
+
+
